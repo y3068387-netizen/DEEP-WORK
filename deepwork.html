@@ -1,0 +1,1868 @@
+﻿<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深度专注 - 全屏倒计时</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+        }
+        body {
+            background-color: #f5f5f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+            transition: all 0.3s;
+        }
+        /* 初始主界面样式 */
+        h1 {
+            font-size: 28px;
+            color: #333;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .subtitle {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        /* 查看记录按钮 */
+        .view-records-btn {
+            margin-bottom: 20px;
+            padding: 10px 24px;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            color: white;
+            background-color: #07C160;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 4px rgba(7, 193, 96, 0.3);
+        }
+        .view-records-btn:hover {
+            background-color: #05a650;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(7, 193, 96, 0.4);
+        }
+        .button-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 30px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .focus-btn {
+            padding: 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: linear-gradient(135deg, #1284ff 0%, #0066cc 100%);
+            box-shadow: 0 2px 8px rgba(18, 132, 255, 0.3);
+        }
+        .rest-btn {
+            padding: 24px;
+            border: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: linear-gradient(135deg, #07C160 0%, #05a650 100%);
+            box-shadow: 0 2px 8px rgba(7, 193, 96, 0.3);
+        }
+        .focus-btn:hover, .rest-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 20px;
+            border-radius: 8px;
+            overflow: hidden;
+            background-color: #fff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .tab {
+            padding: 10px 20px;
+            border: none;
+            background-color: transparent;
+            color: #666;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            flex: 1;
+            text-align: center;
+        }
+        .tab.active {
+            background-color: #1284ff;
+            color: white;
+            font-weight: 600;
+        }
+        /* 统计区域容器 - 适配不同tab内容 */
+        .stats-container {
+            width: 100%;
+            max-width: 800px;
+        }
+        /* 今日统计卡片布局（2列） */
+        .today-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        /* 本周/本月图表容器 */
+        .chart-container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            height: 350px;
+        }
+        .stat-card {
+            background-color: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+        .stat-label {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 8px;
+        }
+        .stat-value {
+            font-size: 28px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        /* 全屏倒计时容器 */
+        .fullscreen-timer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
+            transition: all 0.3s ease;
+        }
+        .fullscreen-timer.focus-mode {
+            background: linear-gradient(135deg, #1284ff 0%, #0066cc 100%);
+        }
+        .fullscreen-timer.rest-mode {
+            background: linear-gradient(135deg, #07C160 0%, #05a650 100%);
+        }
+        .fullscreen-timer.show {
+            display: flex;
+        }
+        /* 笔记输入区域仅在focus模式下显示 */
+        .fullscreen-timer.rest-mode .timer-notes-section {
+            display: none;
+        }
+        .fullscreen-timer.focus-mode .timer-notes-section {
+            display: block;
+        }
+        #fullscreenTimerDisplay {
+            font-size: 100px;
+            font-weight: 600;
+            color: white;
+            margin-bottom: 30px;
+            letter-spacing: 3px;
+        }
+
+        .timer-notes-section {
+            width: 85%;
+            max-width: 750px;
+            margin-bottom: 20px;
+            max-height: 400px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .timer-notes-label {
+            color: #333;
+            font-size: 16px;
+            margin-bottom: 0px;
+            text-align: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-weight: 600;
+        }
+        .timer-editor-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            background-color: #f9f9f9;
+            border-bottom: 1px solid #f0f0f0;
+            position: relative;
+            z-index: 10;
+            flex-wrap: wrap;
+        }
+        .timer-toolbar-btn {
+            padding: 5px 8px;
+            border: 1px solid #e5e5ea;
+            border-radius: 4px;
+            background-color: white;
+            color: #333;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .timer-toolbar-btn:hover {
+            background-color: #f0f0f0;
+        }
+        .timer-toolbar-separator {
+            width: 1px;
+            height: 18px;
+            background-color: #e5e5ea;
+            margin: 0 4px;
+        }
+        .timer-editable-content {
+            min-height: 200px;
+            max-height: 280px;
+            padding: 16px 20px;
+            outline: none;
+            overflow-y: auto;
+            background-color: white;
+            color: #333;
+            border-radius: 0 0 12px 12px;
+        }
+        .timer-editable-content:empty:before {
+            content: attr(placeholder);
+            color: #999;
+            pointer-events: none;
+        }
+        .timer-char-count {
+            text-align: right;
+            font-size: 12px;
+            color: #999;
+            padding: 8px 12px;
+            background: white;
+            border-radius: 0 0 12px 12px;
+        }
+
+        .timer-btn-group {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+        .timer-btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 20px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .timer-btn:hover {
+            transform: scale(1.05);
+        }
+        #pauseContinueBtn {
+            background-color: white;
+            color: #1284ff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .rest-mode #pauseContinueBtn {
+            color: #07C160;
+        }
+        #endBtn {
+            background-color: #ff4d4f;
+            color: white;
+            box-shadow: 0 2px 4px rgba(255, 77, 79, 0.3);
+        }
+
+        /* 深度工作内容记录弹窗样式 */
+        .record-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+        }
+        .record-modal.show {
+            display: flex;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        .modal-title {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .modal-label {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 6px;
+            display: block;
+        }
+        .modal-input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid #e5e5ea;
+            border-radius: 8px;
+            font-size: 14px;
+            margin-bottom: 16px;
+            resize: vertical;
+            min-height: 100px;
+        }
+        .modal-input:focus {
+            outline: none;
+            border-color: #1284ff;
+            box-shadow: 0 0 0 2px rgba(18, 132, 255, 0.1);
+        }
+        .modal-btn-group {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 20px;
+        }
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .save-btn {
+            background-color: #1284ff;
+            color: white;
+        }
+        .save-btn:hover {
+            background-color: #0066cc;
+        }
+        .cancel-btn {
+            background-color: #f5f5f5;
+            color: #666;
+        }
+        .cancel-btn:hover {
+            background-color: #e5e5e5;
+        }
+        
+        .content-type-options {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        .option-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px;
+            border: 1px solid #e5e5ea;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .option-item:hover {
+            background-color: #f9f9f9;
+            border-color: #1284ff;
+        }
+        .option-item input[type="radio"] {
+            width: 16px;
+            height: 16px;
+        }
+        
+        .char-count {
+            text-align: right;
+            font-size: 12px;
+            color: #999;
+            margin-top: -12px;
+            margin-bottom: 16px;
+        }
+        
+        /* 编辑工具栏样式 */
+        .editor-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 8px 12px;
+            background-color: #f9f9f9;
+            border: 1px solid #e5e5ea;
+            border-radius: 8px 8px 0 0;
+            margin-bottom: 0;
+            position: relative;
+            z-index: 10;
+            flex-wrap: wrap;
+        }
+        .toolbar-btn {
+            padding: 5px 8px;
+            border: 1px solid #e5e5ea;
+            border-radius: 4px;
+            background-color: white;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .toolbar-btn:hover {
+            background-color: #f0f0f0;
+        }
+        .toolbar-separator {
+            width: 1px;
+            height: 18px;
+            background-color: #e5e5ea;
+            margin: 0 4px;
+        }
+        .editable-content {
+            border-radius: 0 0 8px 8px;
+            min-height: 200px;
+            max-height: 300px;
+            padding: 16px 20px;
+            border: 1px solid #e5e5ea;
+            border-top: none;
+            outline: none;
+            overflow-y: auto;
+            background-color: white;
+        }
+        .editable-content:empty:before {
+            content: attr(placeholder);
+            color: #999;
+            pointer-events: none;
+        }
+        
+        .modal-section {
+            margin-bottom: 20px;
+        }
+
+        /* ==== 自动多级编号样式 ==== */
+        .editable-content ol, .timer-editable-content ol, .record-content ol {
+            padding-left: 30px;
+            margin-bottom: 12px;
+            margin-top: 8px;
+            line-height: 1.8;
+            list-style-type: cjk-ideographic; 
+        }
+        .editable-content ol ol, .timer-editable-content ol ol, .record-content ol ol {
+            list-style-type: decimal;
+            padding-left: 20px;
+        }
+        .editable-content ol ol ol, .timer-editable-content ol ol ol, .record-content ol ol ol {
+            list-style-type: none;
+            counter-reset: custom-circle;
+            padding-left: 20px;
+        }
+        .editable-content ol ol ol > li, .timer-editable-content ol ol ol > li, .record-content ol ol ol > li {
+            position: relative;
+            counter-increment: custom-circle;
+            margin-bottom: 6px;
+        }
+        .editable-content ol ol ol > li::before, .timer-editable-content ol ol ol > li::before, .record-content ol ol ol > li::before {
+            content: counter(custom-circle);
+            position: absolute;
+            left: -24px;
+            top: 4px;
+            width: 18px;
+            height: 18px;
+            border: 1px solid #333;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 16px;
+            font-size: 12px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #fff;
+        }
+
+        /* ==== 标题 (h1) 样式 ==== */
+        .editable-content h1, .timer-editable-content h1, .record-content h1 {
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            margin-top: 10px;
+            margin-bottom: 15px;
+            color: #222;
+        }
+
+        /* ==== 统一限制图片的最大宽度，防止撑爆容器 ==== */
+        .editable-content img, .timer-editable-content img, .record-content img {
+            max-width: 100%;
+            height: auto;
+            display: block;
+            margin: 10px auto;
+            border-radius: 6px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+
+        /* 历史记录复盘弹窗样式 */
+        .review-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 99999;
+            padding: 20px;
+        }
+        .review-modal.show {
+            display: flex;
+        }
+        .review-content {
+            background-color: white;
+            padding: 24px;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 800px;
+            max-height: 85vh;
+            overflow-y: auto;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        }
+        .review-title {
+            font-size: 18px;
+            color: #333;
+            margin-bottom: 16px;
+            text-align: center;
+            position: relative;
+            font-weight: 600;
+        }
+        .review-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .backup-import-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .backup-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: white;
+            background-color: #07C160;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .backup-btn:hover {
+            background-color: #05a650;
+            transform: translateY(-1px);
+        }
+        .import-file-btn {
+            padding: 6px 12px;
+            border: 1px solid #1284ff;
+            border-radius: 16px;
+            font-size: 12px;
+            color: #1284ff;
+            background-color: white;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .import-file-btn:hover {
+            background-color: #f0f7ff;
+        }
+        #importFileInput {
+            display: none;
+        }
+        .sort-btn {
+            padding: 6px 12px;
+            border: 1px solid #e5e5ea;
+            border-radius: 16px;
+            background-color: white;
+            color: #1284ff;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+        }
+        .sort-btn:hover {
+            background-color: #f0f7ff;
+        }
+        .search-input {
+            padding: 6px 12px;
+            border: 1px solid #e5e5ea;
+            border-radius: 16px;
+            font-size: 12px;
+            width: 180px;
+            outline: none;
+            transition: all 0.2s;
+        }
+        .search-input:focus {
+            border-color: #1284ff;
+            box-shadow: 0 0 0 2px rgba(18, 132, 255, 0.1);
+        }
+        .close-review-btn {
+            position: absolute;
+            top: 0;
+            right: 0;
+            background: none;
+            border: none;
+            font-size: 20px;
+            color: #999;
+            cursor: pointer;
+        }
+        .close-review-btn:hover {
+            color: #ff4d4f;
+        }
+        .record-group {
+            margin-bottom: 24px;
+            border-bottom: 1px solid #f0f0f0;
+            padding-bottom: 16px;
+        }
+        .record-date {
+            font-size: 16px;
+            color: #1284ff;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+        .record-item {
+            background-color: #f9f9f9;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+        .record-item:hover {
+            background-color: #f0f7ff;
+        }
+        .record-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: #999;
+        }
+        .record-duration {
+            color: #07C160;
+            font-weight: 600;
+        }
+        .record-content {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.5;
+        }
+        .no-records {
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+            padding: 40px 0;
+        }
+        .delete-record-btn {
+            padding: 4px 8px;
+            background-color: #f5f5f5;
+            border: 1px solid #e5e5ea;
+            border-radius: 4px;
+            color: #ff4d4f;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .delete-record-btn:hover {
+            background-color: #fff1f0;
+        }
+        .edit-record-btn {
+            padding: 4px 8px;
+            background-color: #f5f5f5;
+            border: 1px solid #e5e5ea;
+            border-radius: 4px;
+            color: #1284ff;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .edit-record-btn:hover {
+            background-color: #f0f7ff;
+        }
+
+        /* 通知授权提示 */
+        .notification-tip {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 16px;
+            font-size: 12px;
+            z-index: 999;
+            display: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+        .notification-tip.show {
+            display: block;
+            animation: fadeInOut 3s ease;
+        }
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+            10% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            90% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(10px); }
+        }
+    </style>
+</head>
+<body>
+    <h1>深度专注</h1>
+    <p class="subtitle">记录每一次专注时刻</p>
+
+    <button class="view-records-btn" onclick="showReviewModal()">📋 查看深度工作记录</button>
+
+    <div class="button-grid">
+        <button class="focus-btn" onclick="startCountdown(60, 'focus')">60分钟 · FOCUS</button>
+        <button class="focus-btn" onclick="startCountdown(45, 'focus')">45分钟 · FOCUS</button>
+        <button class="rest-btn" onclick="startCountdown(20, 'rest')">20分钟 · REST</button>
+        <button class="rest-btn" onclick="startCountdown(10, 'rest')">10分钟 · REST</button>
+    </div>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('today')">今日</button>
+        <button class="tab" onclick="switchTab('week')">本周</button>
+        <button class="tab" onclick="switchTab('month')">本月</button>
+    </div>
+
+    <div class="stats-container">
+        <div id="todayStats" class="today-stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">专注次数</div>
+                <div class="stat-value" id="focusCount">0次</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">总专注时长</div>
+                <div class="stat-value" id="totalFocus">0分钟</div>
+            </div>
+        </div>
+        <div id="weekChart" class="chart-container" style="display: none;">
+            <canvas id="weekFocusChart"></canvas>
+        </div>
+        <div id="monthChart" class="chart-container" style="display: none;">
+            <canvas id="monthFocusChart"></canvas>
+        </div>
+    </div>
+
+    <div class="fullscreen-timer" id="fullscreenTimer">
+        <div id="fullscreenTimerDisplay">00:00</div>
+        
+        <div class="timer-btn-group">
+            <button class="timer-btn" id="pauseContinueBtn" onclick="togglePause()">暂停</button>
+            <button class="timer-btn" id="endBtn" onclick="endTimer()">结束计时</button>
+        </div>
+        
+        <div class="timer-notes-section">
+            <div class="timer-notes-label">笔记与思考</div>
+            <div class="timer-editor-toolbar">
+                <button class="timer-toolbar-btn" onclick="applyTimerFormatStyle('normal')" title="正文">正文</button>
+                <button class="timer-toolbar-btn" onclick="applyTimerFormatStyle('h1')" title="标题">标题</button>
+                <div class="timer-toolbar-separator"></div>
+                <button class="timer-toolbar-btn" onclick="execTimerCommand('bold')" title="加粗"><b>B</b></button>
+                <button class="timer-toolbar-btn" onclick="execTimerCommand('italic')" title="斜体"><i>I</i></button>
+                <button class="timer-toolbar-btn" onclick="execTimerCommand('underline')" title="下划线"><u>U</u></button>
+                <div class="timer-toolbar-separator"></div>
+                <button class="timer-toolbar-btn" onclick="execTimerCommand('insertOrderedList')" title="多级编号">🔢 编号</button>
+                <span style="font-size: 11px; color: #888; margin-left: 4px;">(Tab 下一级，Shift+Tab 上一级)</span>
+                <div class="timer-toolbar-separator"></div>
+                <button class="timer-toolbar-btn" onclick="execTimerCommand('justifyLeft')" title="左对齐">←</button>
+                <button class="timer-toolbar-btn" onclick="execTimerCommand('justifyCenter')" title="居中对齐">↔</button>
+                <button class="timer-toolbar-btn" onclick="execTimerCommand('justifyRight')" title="右对齐">→</button>
+                <div class="timer-toolbar-separator"></div>
+                <button class="timer-toolbar-btn" onclick="triggerImageUpload('timerNotes')" title="插入图片">🖼️ 图片</button>
+            </div>
+            <div class="timer-editable-content" id="timerNotes" contenteditable="true" placeholder="支持使用 Tab 键实现子级编号缩进，点击 🖼️ 插入图片"></div>
+            <div class="timer-char-count">
+                <span id="timerCharCount">0</span>字
+            </div>
+        </div>
+    </div>
+
+    <div class="record-modal" id="recordModal">
+        <div class="modal-content">
+            <h3 class="modal-title">记录本次深度工作内容</h3>
+            <div class="modal-section">
+                <label class="modal-label">内容类型：</label>
+                <div class="content-type-options">
+                    <label class="option-item"><input type="radio" name="contentType" value="1" onclick="nextRecordModal()"> 1、企业研习</label>
+                    <label class="option-item"><input type="radio" name="contentType" value="2" onclick="nextRecordModal()"> 2、阅读</label>
+                    <label class="option-item"><input type="radio" name="contentType" value="3" onclick="nextRecordModal()"> 3、整理输出</label>
+                    <label class="option-item"><input type="radio" name="contentType" value="4" onclick="nextRecordModal()"> 4、AI问答</label>
+                    <label class="option-item"><input type="radio" name="contentType" value="5" onclick="nextRecordModal()"> 5、其他</label>
+                </div>
+            </div>
+            <div class="modal-btn-group">
+                <button class="modal-btn cancel-btn" onclick="closeRecordModal()">取消</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="record-modal" id="recordModalDetails">
+        <div class="modal-content">
+            <h3 class="modal-title">记录本次深度工作内容</h3>
+            <div class="modal-btn-group" style="margin-bottom: 20px; margin-top: 0;">
+                <button class="modal-btn save-btn" onclick="saveWorkRecord()">保存记录</button>
+                <button class="modal-btn cancel-btn" onclick="closeRecordModalDetails()">取消</button>
+                <button class="modal-btn" onclick="backToRecordModal()">上一步</button>
+            </div>
+            
+            <div class="content-type-fields">
+                <div id="companyStudyFields" style="display: none;">
+                    <label class="modal-label" for="companyName">1、企业名称：</label>
+                    <input type="text" class="modal-input" id="companyName" placeholder="请输入企业名称" style="min-height: auto;">
+                    <label class="modal-label" for="studyContent">2、研习内容：</label>
+                    <textarea class="modal-input" id="studyContent" placeholder="请描述研习内容"></textarea>
+                </div>
+                <div id="readingFields" style="display: none;">
+                    <label class="modal-label" for="readingContent">阅读内容：</label>
+                    <textarea class="modal-input" id="readingContent" placeholder="请描述阅读内容"></textarea>
+                </div>
+                <div id="outputFields" style="display: none;">
+                    <label class="modal-label" for="outputTopic">1、输出主题：</label>
+                    <input type="text" class="modal-input" id="outputTopic" placeholder="请输入输出主题" style="min-height: auto;">
+                    <label class="modal-label" for="outputFormat">2、输出形式：</label>
+                    <input type="text" class="modal-input" id="outputFormat" placeholder="请输入输出形式" style="min-height: auto;">
+                </div>
+                <div id="aiQAFields" style="display: none;">
+                    <label class="modal-label" for="aiQATopic">1、问答主题：</label>
+                    <input type="text" class="modal-input" id="aiQATopic" placeholder="请输入问答主题" style="min-height: auto;">
+                </div>
+                <div id="otherFields" style="display: none;">
+                    <label class="modal-label" for="otherContent">内容：</label>
+                    <textarea class="modal-input" id="otherContent" placeholder="请描述其他内容"></textarea>
+                </div>
+            </div>
+            
+            <div class="modal-section">
+                <label class="modal-label" for="notes">笔记与思考：</label>
+                <div class="editor-toolbar">
+                    <button class="toolbar-btn" onclick="applyFormatStyle('normal')" title="正文">正文</button>
+                    <button class="toolbar-btn" onclick="applyFormatStyle('h1')" title="标题">标题</button>
+                    <div class="toolbar-separator"></div>
+                    <button class="toolbar-btn" onclick="execCommand('bold')" title="加粗"><b>B</b></button>
+                    <button class="toolbar-btn" onclick="execCommand('italic')" title="斜体"><i>I</i></button>
+                    <button class="toolbar-btn" onclick="execCommand('underline')" title="下划线"><u>U</u></button>
+                    <div class="toolbar-separator"></div>
+                    <button class="toolbar-btn" onclick="execCommand('insertOrderedList')" title="多级编号">🔢 编号</button>
+                    <span style="font-size: 11px; color: #888; margin-left: 4px;">(Tab 下一级，Shift+Tab 上一级)</span>
+                    <div class="toolbar-separator"></div>
+                    <button class="toolbar-btn" onclick="execCommand('justifyLeft')" title="左对齐">←</button>
+                    <button class="toolbar-btn" onclick="execCommand('justifyCenter')" title="居中对齐">↔</button>
+                    <button class="toolbar-btn" onclick="execCommand('justifyRight')" title="右对齐">→</button>
+                    <div class="toolbar-separator"></div>
+                    <button class="toolbar-btn" onclick="triggerImageUpload('notes')" title="插入图片">🖼️ 图片</button>
+                </div>
+                <div class="modal-input editable-content" id="notes" contenteditable="true" placeholder="支持使用 Tab 键实现子级编号缩进，点击 🖼️ 插入图片"></div>
+                <div class="char-count">
+                    <span id="charCount">0</span>字
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="review-modal" id="reviewModal">
+        <div class="review-content">
+            <h3 class="review-title">
+                深度工作记录复盘
+                <button class="close-review-btn" onclick="closeReviewModal()">×</button>
+            </h3>
+            <div class="review-toolbar">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <button class="sort-btn" onclick="toggleSortOrder()">
+                        <span id="sortText">最新在前</span>
+                        <span id="sortIcon">↓</span>
+                    </button>
+                    <label style="display: flex; align-items: center; gap: 5px; font-size: 14px;">
+                        <input type="checkbox" id="selectAllCheckbox" onclick="toggleSelectAll()" style="width: 18px; height: 18px;">
+                        全选
+                    </label>
+                    <button class="sort-btn" onclick="selectTodayRecords()">勾选当天</button>
+                    <button class="sort-btn" onclick="deleteSelectedRecords()" style="background-color: #ff4d4f; color: white;">
+                        🗑️ 删除所选
+                    </button>
+                </div>
+                <div class="search-backup-group" style="display: flex; align-items: center; gap: 8px;">
+                    <div class="backup-import-group">
+                        <button class="backup-btn" onclick="manualBackupRecords()">💾 备份本地记录</button>
+                        <button class="backup-btn" onclick="exportSelectedRecordsToWord()" style="background-color:#1a73e8;">📄 导出WORD文档</button>
+                        <label for="importFileInput" class="import-file-btn">📤 导入记录</label>
+                        <input type="file" id="importFileInput" accept=".json" onchange="importRecordsFromFile(event)">
+                    </div>
+                    <div style="position: relative;">
+                        <input type="text" class="search-input" id="recordSearchInput" placeholder="搜索" oninput="searchRecords()">
+                    </div>
+                </div>
+            </div>
+            <div id="reviewRecordsList"></div>
+        </div>
+    </div>
+
+    <input type="file" id="imageUploadInput" accept="image/*" style="display: none;" onchange="handleImageUpload(event)">
+
+    <audio id="timerAlertSound" src="卡农钢琴曲.mp3" preload="auto"></audio>
+    <div class="notification-tip" id="notificationTip">已请求桌面通知权限，后台也能收到提醒～</div>
+
+    <script>
+        let timerInterval;
+        let totalFocusMinutes = 0;
+        let focusCount = 0;
+        let currentTab = 'today';
+        let remainingSeconds = 0;
+        let currentTotalMinutes = 0;
+        let isPaused = false;
+        let currentMode = 'focus';
+        let currentFocusType = 0;
+        let startTime = 0;      
+        let pauseTime = 0;      
+        let elapsedTime = 0;    
+        let sortOrder = 'desc';
+        let searchKeyword = '';
+        let allRecordsData = [];
+        let weekChartInstance = null;
+        let monthChartInstance = null;
+        let currentEditingRecord = null;
+        let currentEditingDate = null;
+
+        // ====== 选区保存逻辑（用于确保图片插入在光标位置） ======
+        let savedRange = null;
+        function saveSelection() {
+            if (window.getSelection) {
+                let sel = window.getSelection();
+                if (sel.getRangeAt && sel.rangeCount) {
+                    savedRange = sel.getRangeAt(0);
+                }
+            }
+        }
+        function restoreSelection() {
+            if (savedRange) {
+                if (window.getSelection) {
+                    let sel = window.getSelection();
+                    sel.removeAllRanges();
+                    sel.addRange(savedRange);
+                }
+            }
+        }
+
+        // ====== 图片插入核心逻辑（含画质压缩） ======
+        let currentTargetEditorId = null;
+
+        function triggerImageUpload(editorId) {
+            currentTargetEditorId = editorId;
+            saveSelection(); // 打开文件框前保存光标位置
+            document.getElementById('imageUploadInput').click();
+        }
+
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    // 创建 canvas 进行压缩
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // 限制最大宽度为 800px，防止撑爆 localStorage
+                    const MAX_WIDTH = 800;
+                    if (width > MAX_WIDTH) {
+                        height *= MAX_WIDTH / width;
+                        width = MAX_WIDTH;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // 导出为 70% 质量的 JPEG
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7);
+
+                    // 插入到对应的编辑器
+                    if (currentTargetEditorId) {
+                        const editor = document.getElementById(currentTargetEditorId);
+                        editor.focus();
+                        restoreSelection();
+                        
+                        // 生成图片标签，换行包裹以防与文字粘连
+                        const imgTag = `<br><img src="${dataUrl}" alt="工作配图"><br>`;
+                        document.execCommand('insertHTML', false, imgTag);
+                        
+                        // 更新字数
+                        if(currentTargetEditorId === 'notes') updateCharCount();
+                        if(currentTargetEditorId === 'timerNotes') updateTimerCharCount();
+                    }
+                    
+                    // 清空 input 值，允许重复传同一张图
+                    event.target.value = '';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // ====== 监听按键：实现 Tab 缩进 ======
+        function handleTabIndent(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault(); 
+                const command = e.shiftKey ? 'outdent' : 'indent';
+                document.execCommand(command, false, null);
+            }
+        }
+
+        window.onload = function() {
+            initTodayStats();
+            document.addEventListener('click', requestNotificationPermission, { once: true });
+            
+            const notes = document.getElementById('notes');
+            if (notes) {
+                ['input', 'keyup', 'paste', 'cut'].forEach(e => notes.addEventListener(e, updateCharCount));
+                notes.addEventListener('keydown', handleTabIndent);
+                // 随时记录光标位置
+                ['keyup', 'mouseup'].forEach(e => notes.addEventListener(e, saveSelection));
+            }
+            
+            const timerNotes = document.getElementById('timerNotes');
+            if (timerNotes) {
+                ['input', 'keyup', 'paste', 'cut'].forEach(e => timerNotes.addEventListener(e, updateTimerCharCount));
+                timerNotes.addEventListener('keydown', handleTabIndent);
+                ['keyup', 'mouseup'].forEach(e => timerNotes.addEventListener(e, saveSelection));
+            }
+        };
+
+        function initTodayStats() {
+            const today = new Date().toLocaleDateString();
+            const todayData = localStorage.getItem(`deepWork_${today}`);
+            if (todayData) {
+                const data = JSON.parse(todayData);
+                focusCount = data.count;
+                totalFocusMinutes = data.totalMinutes;
+                updateStatsDisplay();
+            }
+        }
+
+        function saveTodayStats() {
+            const today = new Date().toLocaleDateString();
+            const todayData = {
+                count: focusCount,
+                totalMinutes: totalFocusMinutes,
+                records: JSON.parse(localStorage.getItem(`deepWorkRecords_${today}`)) || []
+            };
+            try {
+                localStorage.setItem(`deepWork_${today}`, JSON.stringify(todayData));
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    alert('注意：浏览器本地存储空间已满！请删除一些旧的带图记录，或改用纯文本。');
+                }
+            }
+        }
+
+        function requestNotificationPermission() {
+            if ('Notification' in window) {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        showNotificationTip('已开启桌面通知，后台也能收到计时提醒～');
+                    }
+                });
+            }
+        }
+
+        function showNotificationTip(text) {
+            const tip = document.getElementById('notificationTip');
+            tip.textContent = text;
+            tip.classList.add('show');
+            setTimeout(() => { tip.classList.remove('show'); }, 3000);
+        }
+
+        function playAlertSound() {
+            const sound = document.getElementById('timerAlertSound');
+            sound.currentTime = 0;
+            sound.loop = true;
+            sound.play().catch(err => console.log('提示音播放失败', err));
+        }
+
+        function stopAlertSound() {
+            const sound = document.getElementById('timerAlertSound');
+            sound.pause();
+            sound.currentTime = 0;
+            sound.loop = false;
+        }
+
+        function showNotification(title, body) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            const notification = new Notification(title, { body: body, icon: 'https://cdn-icons-png.flaticon.com/512/2544/2544936.png' });
+            notification.onclick = () => { window.focus(); notification.close(); };
+            setTimeout(() => { notification.close(); }, 10000);
+        }
+
+        function startCountdown(minutes, mode) {
+            clearInterval(timerInterval);
+            currentTotalMinutes = minutes;
+            currentFocusType = minutes;
+            remainingSeconds = minutes * 60;
+            currentMode = mode;
+            isPaused = false;
+            elapsedTime = 0;
+            startTime = Date.now(); 
+
+            // 清空计时界面的笔记内容
+            const timerNotes = document.getElementById('timerNotes');
+            if (timerNotes) timerNotes.innerHTML = '';
+            const timerCharCount = document.getElementById('timerCharCount');
+            if (timerCharCount) timerCharCount.textContent = '0字';
+
+            const fullscreenTimer = document.getElementById('fullscreenTimer');
+            const pauseContinueBtn = document.getElementById('pauseContinueBtn');
+            fullscreenTimer.classList.remove('focus-mode', 'rest-mode');
+            fullscreenTimer.classList.add(`${mode}-mode`);
+            pauseContinueBtn.textContent = '暂停';
+
+            fullscreenTimer.classList.add('show');
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                if (!isPaused) {
+                    const currentTime = Date.now();
+                    elapsedTime = Math.floor((currentTime - startTime) / 1000);
+                    remainingSeconds = (minutes * 60) - elapsedTime;
+
+                    if (remainingSeconds <= 0) {
+                        remainingSeconds = 0;
+                        clearInterval(timerInterval);
+                        playAlertSound();
+                        if (mode === 'focus') showNotification('专注时间结束！', '恭喜你完成了' + minutes + '分钟的深度专注～');
+                        else showNotification('休息时间结束！', '该回到工作状态了，继续加油～');
+                    }
+                    updateTimerDisplay();
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            const minutes = Math.floor(remainingSeconds / 60);
+            const seconds = remainingSeconds % 60;
+            document.getElementById('fullscreenTimerDisplay').textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function togglePause() {
+            const pauseContinueBtn = document.getElementById('pauseContinueBtn');
+            isPaused = !isPaused;
+            if (isPaused) {
+                pauseTime = Date.now();
+                pauseContinueBtn.textContent = '继续';
+                stopAlertSound();
+            } else {
+                const resumeTime = Date.now();
+                startTime += (resumeTime - pauseTime);
+                pauseContinueBtn.textContent = '暂停';
+                if (remainingSeconds <= 0) playAlertSound();
+            }
+        }
+
+        function endTimer() {
+            clearInterval(timerInterval);
+            document.getElementById('fullscreenTimer').classList.remove('show');
+            stopAlertSound();
+
+            if (currentMode === 'focus') {
+                const usedMinutes = Math.floor(elapsedTime / 60);
+                if (usedMinutes >= 1) {
+                    updateStats(usedMinutes);
+                    if (currentFocusType === 60 || currentFocusType === 45) {
+                        const timerNotes = document.getElementById('timerNotes');
+                        const notesContent = timerNotes.innerHTML;
+                        showRecordModal();
+                        setTimeout(() => {
+                            const notes = document.getElementById('notes');
+                            if (notes) {
+                                notes.innerHTML = notesContent;
+                                updateCharCount();
+                            }
+                        }, 100);
+                    }
+                }
+            }
+        }
+
+        function updateStats(minutes) {
+            totalFocusMinutes += minutes;
+            focusCount++;
+            updateStatsDisplay();
+            saveTodayStats();
+        }
+
+        function updateStatsDisplay() {
+            document.getElementById('focusCount').textContent = `${focusCount}次`;
+            document.getElementById('totalFocus').textContent = `${totalFocusMinutes}分钟`;
+            if (currentTab === 'week') renderWeekChart();
+            else if (currentTab === 'month') renderMonthChart();
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.tab[onclick="switchTab('${tab}')"]`).classList.add('active');
+            
+            document.getElementById('todayStats').style.display = 'none';
+            document.getElementById('weekChart').style.display = 'none';
+            document.getElementById('monthChart').style.display = 'none';
+            
+            if (tab === 'today') document.getElementById('todayStats').style.display = 'grid';
+            else if (tab === 'week') { document.getElementById('weekChart').style.display = 'block'; renderWeekChart(); }
+            else if (tab === 'month') { document.getElementById('monthChart').style.display = 'block'; renderMonthChart(); }
+        }
+
+        function renderWeekChart() {
+            if (weekChartInstance) weekChartInstance.destroy();
+            const ctx = document.getElementById('weekFocusChart').getContext('2d');
+            const weekDays = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+            const weekData = [0, 0, 0, 0, 0, 0, 0];
+            const today = new Date().getDay();
+            const dayIndex = today === 0 ? 6 : today - 1;
+            weekData[dayIndex] = totalFocusMinutes;
+            
+            weekChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: weekDays, datasets: [{ label: '专注时长（分钟）', data: weekData, backgroundColor: 'rgba(0, 122, 255, 0.7)', borderRadius: 8 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        function renderMonthChart() {
+            if (monthChartInstance) monthChartInstance.destroy();
+            const ctx = document.getElementById('monthFocusChart').getContext('2d');
+            const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
+            const monthDays = Array.from({length: daysInMonth}, (_, i) => i + 1);
+            const monthData = Array(daysInMonth).fill(0);
+            const today = new Date().getDate();
+            monthData[today - 1] = totalFocusMinutes;
+            
+            monthChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { labels: monthDays, datasets: [{ label: '专注时长（分钟）', data: monthData, borderColor: 'rgba(0, 122, 255, 1)', tension: 0.1 }] },
+                options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true } } }
+            });
+        }
+
+        function showRecordModal() {
+            document.getElementById('recordModal').classList.add('show');
+            document.querySelectorAll('input[name="contentType"]').forEach(radio => radio.checked = false);
+        }
+
+        function closeRecordModal() {
+            document.getElementById('recordModal').classList.remove('show');
+        }
+
+        function nextRecordModal() {
+            const selectedType = document.querySelector('input[name="contentType"]:checked');
+            if (!selectedType) return alert('请选择内容类型！');
+            
+            document.getElementById('recordModal').classList.remove('show');
+            document.getElementById('recordModalDetails').classList.add('show');
+            
+            ['companyStudyFields', 'readingFields', 'outputFields', 'aiQAFields', 'otherFields'].forEach(id => {
+                document.getElementById(id).style.display = 'none';
+            });
+            
+            switch(selectedType.value) {
+                case '1': document.getElementById('companyStudyFields').style.display = 'block'; break;
+                case '2': document.getElementById('readingFields').style.display = 'block'; break;
+                case '3': document.getElementById('outputFields').style.display = 'block'; break;
+                case '4': document.getElementById('aiQAFields').style.display = 'block'; break;
+                case '5': document.getElementById('otherFields').style.display = 'block'; break;
+            }
+            updateCharCount();
+        }
+
+        function backToRecordModal() {
+            document.getElementById('recordModalDetails').classList.remove('show');
+            document.getElementById('recordModal').classList.add('show');
+        }
+
+        function closeRecordModalDetails() {
+            document.getElementById('recordModalDetails').classList.remove('show');
+            ['companyName', 'studyContent', 'readingContent', 'outputTopic', 'outputFormat', 'aiQATopic', 'otherContent'].forEach(id => {
+                document.getElementById(id).value = '';
+            });
+            document.getElementById('notes').innerHTML = '';
+            document.getElementById('charCount').textContent = '0字';
+            currentEditingRecord = null;
+            currentEditingDate = null;
+        }
+
+        function execCommand(command, value = null) {
+            document.getElementById('notes').focus();
+            document.execCommand(command, false, value);
+        }
+        
+        function execTimerCommand(command, value = null) {
+            document.getElementById('timerNotes').focus();
+            document.execCommand(command, false, value);
+        }
+
+        function applyFormatStyle(style) {
+            const notes = document.getElementById('notes');
+            notes.focus();
+            document.execCommand('formatBlock', false, style === 'h1' ? '<h1>' : '<p>');
+        }
+
+        function applyTimerFormatStyle(style) {
+            const timerNotes = document.getElementById('timerNotes');
+            timerNotes.focus();
+            document.execCommand('formatBlock', false, style === 'h1' ? '<h1>' : '<p>');
+        }
+
+        function updateTimerCharCount() {
+            const text = document.getElementById('timerNotes').innerText || '';
+            document.getElementById('timerCharCount').textContent = text.length + '字';
+        }
+
+        function updateCharCount() {
+            const text = document.getElementById('notes').innerText || '';
+            document.getElementById('charCount').textContent = text.length + '字';
+        }
+
+        function saveWorkRecord() {
+            const selectedType = document.querySelector('input[name="contentType"]:checked');
+            if (!selectedType) return alert('请选择内容类型！');
+            
+            let content = '';
+            switch(selectedType.value) {
+                case '1':
+                    const companyName = document.getElementById('companyName').value.trim();
+                    const studyContent = document.getElementById('studyContent').value.trim();
+                    if (!companyName || !studyContent) return alert('请填写企业名称和研习内容！');
+                    content = `企业研习\n1、企业名称：${companyName}\n2、研习内容：${studyContent}`;
+                    break;
+                case '2':
+                    const readingContent = document.getElementById('readingContent').value.trim();
+                    if (!readingContent) return alert('请填写阅读内容！');
+                    content = `阅读\n阅读内容：${readingContent}`;
+                    break;
+                case '3':
+                    const outputTopic = document.getElementById('outputTopic').value.trim();
+                    const outputFormat = document.getElementById('outputFormat').value.trim();
+                    if (!outputTopic || !outputFormat) return alert('请填写输出主题和输出形式！');
+                    content = `整理输出\n1、输出主题：${outputTopic}\n2、输出形式：${outputFormat}`;
+                    break;
+                case '4':
+                    const aiQATopic = document.getElementById('aiQATopic').value.trim();
+                    if (!aiQATopic) return alert('请填写问答主题！');
+                    content = `AI问答\n1、问答主题：${aiQATopic}`;
+                    break;
+                case '5':
+                    const otherContent = document.getElementById('otherContent').value.trim();
+                    if (!otherContent) return alert('请填写其他内容！');
+                    content = `其他\n${otherContent}`;
+                    break;
+            }
+            
+            const notesContent = document.getElementById('notes').innerHTML;
+            if (notesContent.trim()) content += `\n\n笔记与思考：\n${notesContent.trim()}`;
+            
+            const today = new Date().toLocaleDateString();
+            const time = new Date().toLocaleTimeString();
+            const duration = Math.floor(elapsedTime / 60) || 0; 
+            
+            try {
+                if (currentEditingRecord) {
+                    const key = `deepWorkRecords_${currentEditingDate}`;
+                    let records = JSON.parse(localStorage.getItem(key)) || [];
+                    const recordIndex = records.findIndex(r => r.id === currentEditingRecord.id);
+                    if (recordIndex !== -1) {
+                        records[recordIndex] = { ...currentEditingRecord, content: content, time: time };
+                        localStorage.setItem(key, JSON.stringify(records));
+                        if (currentEditingDate === today) recalculateTodayStats();
+                        closeRecordModalDetails();
+                        alert('记录修改成功！');
+                        if (document.getElementById('reviewModal').classList.contains('show')) loadAllRecords();
+                    }
+                } else {
+                    const record = { id: Date.now(), time: time, duration: duration, content: content };
+                    let todayRecords = JSON.parse(localStorage.getItem(`deepWorkRecords_${today}`)) || [];
+                    todayRecords.push(record);
+                    localStorage.setItem(`deepWorkRecords_${today}`, JSON.stringify(todayRecords));
+                    saveTodayStats();
+                    closeRecordModalDetails();
+                    alert('记录保存成功！');
+                }
+            } catch (e) {
+                if (e.name === 'QuotaExceededError') {
+                    alert('⚠️ 无法保存！浏览器本地存储空间已满。请先删除一些带多张图片的旧记录。');
+                } else {
+                    alert('保存失败：' + e.message);
+                }
+            }
+        }
+
+        function editRecord(date, recordId) {
+            const key = `deepWorkRecords_${date}`;
+            const records = JSON.parse(localStorage.getItem(key)) || [];
+            const record = records.find(r => r.id === recordId);
+            
+            if (record) {
+                currentEditingRecord = record;
+                currentEditingDate = date;
+                
+                const contentText = record.content;
+                const notesIndex = contentText.indexOf('笔记与思考：');
+                
+                let upperPart = contentText;
+                let notesHTML = '';
+                
+                if (notesIndex !== -1) {
+                    upperPart = contentText.substring(0, notesIndex);
+                    notesHTML = contentText.substring(notesIndex + 6).trim();
+                }
+                
+                const lines = upperPart.split('\n');
+                let contentType = '5';
+                
+                if (lines[0].includes('企业研习')) contentType = '1';
+                else if (lines[0].includes('阅读')) contentType = '2';
+                else if (lines[0].includes('整理输出')) contentType = '3';
+                else if (lines[0].includes('AI问答')) contentType = '4';
+                
+                document.getElementById('reviewModal').classList.remove('show');
+                document.getElementById('recordModal').classList.add('show');
+                document.querySelector(`input[name="contentType"][value="${contentType}"]`).checked = true;
+                
+                setTimeout(() => {
+                    nextRecordModal();
+                    
+                    if (contentType === '1') {
+                        lines.forEach(l => {
+                            if (l.includes('企业名称：')) document.getElementById('companyName').value = l.replace('1、企业名称：','').trim();
+                            if (l.includes('研习内容：')) document.getElementById('studyContent').value = l.replace('2、研习内容：','').trim();
+                        });
+                    } else if (contentType === '2') {
+                        lines.forEach(l => { if (l.includes('阅读内容：')) document.getElementById('readingContent').value = l.replace('阅读内容：','').trim(); });
+                    } else if (contentType === '3') {
+                        lines.forEach(l => {
+                            if (l.includes('输出主题：')) document.getElementById('outputTopic').value = l.replace('1、输出主题：','').trim();
+                            if (l.includes('输出形式：')) document.getElementById('outputFormat').value = l.replace('2、输出形式：','').trim();
+                        });
+                    } else if (contentType === '4') {
+                        lines.forEach(l => { if (l.includes('问答主题：')) document.getElementById('aiQATopic').value = l.replace('1、问答主题：','').trim(); });
+                    } else {
+                        document.getElementById('otherContent').value = lines.slice(1).join('\n').trim();
+                    }
+                    
+                    document.getElementById('notes').innerHTML = notesHTML;
+                    updateCharCount();
+                }, 100);
+            }
+        }
+
+        function showReviewModal() {
+            document.getElementById('reviewModal').classList.add('show');
+            loadAllRecords();
+        }
+
+        function closeReviewModal() {
+            document.getElementById('reviewModal').classList.remove('show');
+        }
+
+        function loadAllRecords() {
+            allRecordsData = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key.startsWith('deepWorkRecords_')) {
+                    allRecordsData.push({ date: key.replace('deepWorkRecords_', ''), records: JSON.parse(localStorage.getItem(key)) || [] });
+                }
+            }
+            allRecordsData.sort((a, b) => new Date(b.date) - new Date(a.date));
+            renderRecords();
+        }
+
+        function renderRecords() {
+            const listContainer = document.getElementById('reviewRecordsList');
+            listContainer.innerHTML = '';
+            
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+            if (selectAllCheckbox) selectAllCheckbox.checked = false;
+            
+            let filteredData = allRecordsData.map(item => {
+                return { date: item.date, records: item.records.filter(r => r.content.toLowerCase().includes(searchKeyword.toLowerCase())) };
+            }).filter(item => item.records.length > 0);
+            
+            if (sortOrder === 'asc') {
+                filteredData = filteredData.reverse();
+                filteredData.forEach(item => item.records.sort((a, b) => a.id - b.id));
+            } else {
+                filteredData.forEach(item => item.records.sort((a, b) => b.id - a.id));
+            }
+            
+            if (filteredData.length === 0) return listContainer.innerHTML = '<div class="no-records">暂无匹配的深度工作记录</div>';
+            
+            filteredData.forEach(group => {
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'record-group';
+                
+                const dateTitle = document.createElement('div');
+                dateTitle.className = 'record-date';
+                dateTitle.textContent = group.date;
+                groupDiv.appendChild(dateTitle);
+                
+                group.records.forEach(record => {
+                    const recordItem = document.createElement('div');
+                    recordItem.className = 'record-item';
+                    
+                    let upperPart = record.content;
+                    let notesHTML = '';
+                    const notesIndex = record.content.indexOf('笔记与思考：');
+                    if (notesIndex !== -1) {
+                        upperPart = record.content.substring(0, notesIndex);
+                        notesHTML = record.content.substring(notesIndex + 6).trim();
+                    }
+                    
+                    let formattedUpper = upperPart.split('\n').map(line => {
+                        if (['企业研习','阅读','整理输出','AI问答','其他'].some(t => line.includes(t))) return `<strong style="color: #007AFF;">${line}</strong>`;
+                        if (line.includes('：')) return `<span style="font-weight: bold;">${line.split('：')[0]}：</span>${line.split('：').slice(1).join('：')}`;
+                        return line;
+                    }).join('<br>');
+
+                    let finalDisplayHTML = formattedUpper;
+                    if (notesHTML) {
+                        finalDisplayHTML += `<br><br><strong style="color: #34C759;">笔记与思考：</strong><div class="record-content" style="margin-top:8px; padding-left:10px; border-left:3px solid #e0e0e0;">${notesHTML}</div>`;
+                    }
+                    
+                    recordItem.innerHTML = `
+                        <div class="record-header">
+                            <input type="checkbox" class="record-checkbox" data-date="${group.date}" data-id="${record.id}" style="margin-right: 10px; width: 20px; height: 20px;">
+                            <span>时间：${record.time}</span>
+                            <span class="record-duration">时长：${record.duration}分钟</span>
+                        </div>
+                        <div class="record-content" style="white-space: normal; line-height: 1.8;">${finalDisplayHTML}</div>
+                        <div style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button class="edit-record-btn" onclick="editRecord('${group.date}', ${record.id})">编辑记录</button>
+                            <button class="delete-record-btn" onclick="deleteRecord('${group.date}', ${record.id})">删除记录</button>
+                        </div>
+                    `;
+                    groupDiv.appendChild(recordItem);
+                });
+                listContainer.appendChild(groupDiv);
+            });
+        }
+
+        function toggleSortOrder() {
+            sortOrder = sortOrder === 'desc' ? 'asc' : 'desc';
+            document.getElementById('sortText').textContent = sortOrder === 'desc' ? '最新在前' : '最早在前';
+            document.getElementById('sortIcon').textContent = sortOrder === 'desc' ? '↓' : '↑';
+            renderRecords();
+        }
+
+        function searchRecords() { searchKeyword = document.getElementById('recordSearchInput').value.trim(); renderRecords(); }
+        function toggleSelectAll() {
+            const isChecked = document.getElementById('selectAllCheckbox').checked;
+            document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = isChecked);
+        }
+        function selectTodayRecords() {
+            const today = new Date().toLocaleDateString();
+            document.querySelectorAll('.record-checkbox').forEach(cb => cb.checked = (cb.dataset.date === today));
+            if (document.getElementById('selectAllCheckbox')) document.getElementById('selectAllCheckbox').checked = false;
+        }
+
+        function deleteSelectedRecords() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return alert('请选择要删除的记录！');
+            if (!confirm(`确定要删除选中的 ${checkboxes.length} 条记录吗？`)) return;
+            
+            checkboxes.forEach(checkbox => {
+                const key = `deepWorkRecords_${checkbox.dataset.date}`;
+                let records = (JSON.parse(localStorage.getItem(key)) || []).filter(r => r.id !== parseInt(checkbox.dataset.id));
+                records.length === 0 ? localStorage.removeItem(key) : localStorage.setItem(key, JSON.stringify(records));
+                if (checkbox.dataset.date === new Date().toLocaleDateString()) recalculateTodayStats();
+            });
+            loadAllRecords();
+            showNotificationTip(`✅ 已删除选中的 ${checkboxes.length} 条记录！`);
+        }
+
+        function deleteRecord(date, id) {
+            if (!confirm('确定要删除这条记录吗？')) return;
+            const key = `deepWorkRecords_${date}`;
+            let records = (JSON.parse(localStorage.getItem(key)) || []).filter(r => r.id !== id);
+            records.length === 0 ? localStorage.removeItem(key) : localStorage.setItem(key, JSON.stringify(records));
+            if (date === new Date().toLocaleDateString()) recalculateTodayStats();
+            loadAllRecords();
+        }
+
+        function recalculateTodayStats() {
+            const today = new Date().toLocaleDateString();
+            const todayRecords = JSON.parse(localStorage.getItem(`deepWorkRecords_${today}`)) || [];
+            focusCount = todayRecords.length;
+            totalFocusMinutes = todayRecords.reduce((sum, r) => sum + r.duration, 0);
+            updateStatsDisplay();
+            saveTodayStats();
+        }
+
+        function manualBackupRecords() {
+            const allBackupData = { exportTime: new Date().toLocaleString(), records: allRecordsData.length > 0 ? allRecordsData : loadAllRecordsForBackup() };
+            const blob = new Blob([JSON.stringify(allBackupData, null, 2)], { type: 'application/json;charset=utf-8' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `深度工作记录_${new Date().toISOString().slice(0, 10).replace(/-/g, '')}.json`;
+            a.click();
+            showNotificationTip('📤 记录已手动备份到本地！');
+        }
+
+        function loadAllRecordsForBackup() {
+            let backupData = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                if (localStorage.key(i).startsWith('deepWorkRecords_')) {
+                    backupData.push({ date: localStorage.key(i).replace('deepWorkRecords_', ''), records: JSON.parse(localStorage.getItem(localStorage.key(i))) || [] });
+                }
+            }
+            return backupData.sort((a, b) => new Date(b.date) - new Date(a.date));
+        }
+
+        function importRecordsFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importData = JSON.parse(e.target.result);
+                    if (!importData.records) throw new Error('文件格式错误');
+                    importData.records.forEach(item => {
+                        const key = `deepWorkRecords_${item.date}`;
+                        const existingRecords = JSON.parse(localStorage.getItem(key)) || [];
+                        const uniqueRecords = Array.from(new Map([...existingRecords, ...item.records].map(r => [r.id, r])).values());
+                        localStorage.setItem(key, JSON.stringify(uniqueRecords));
+                    });
+                    recalculateTodayStats();
+                    showNotificationTip('✅ 记录导入成功！');
+                    if (document.getElementById('reviewModal').classList.contains('show')) loadAllRecords();
+                } catch (err) { 
+                    if (err.name === 'QuotaExceededError') {
+                        alert('⚠️ 无法导入！浏览器本地存储空间已满。');
+                    } else {
+                        alert('导入失败：' + err.message);
+                    }
+                }
+            };
+            reader.readAsText(file);
+        }
+        
+        function exportSelectedRecordsToWord() {
+            const checkboxes = document.querySelectorAll('.record-checkbox:checked');
+            if (checkboxes.length === 0) return alert('请选择要导出的记录！');
+            
+            const selectedRecords = [];
+            checkboxes.forEach(checkbox => {
+                const group = allRecordsData.find(item => item.date === checkbox.dataset.date);
+                if (group) {
+                    const record = group.records.find(r => r.id === parseInt(checkbox.dataset.id));
+                    if (record) selectedRecords.push({ date: checkbox.dataset.date, record });
+                }
+            });
+            
+            let htmlContent = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head>
+                <meta charset="UTF-8">
+                <title>深度工作记录</title>
+                <style>
+                    body { font-family: "Microsoft YaHei", SimSun, sans-serif; line-height: 1.5; color: #333; }
+                    .record-box { 
+                        margin-bottom: 30px; 
+                        padding: 20px; 
+                        border: 1px solid #ddd; 
+                        background-color: #fff;
+                    }
+                    .date-title { 
+                        font-size: 18pt; 
+                        color: #1a73e8; 
+                        font-weight: bold; 
+                        margin: 0 0 10px 0; 
+                    }
+                    .content-type-section { 
+                        background-color: #e8f0fe; 
+                        padding: 8px 12px; 
+                        margin: 0 0 15px 0; 
+                        font-weight: bold; 
+                        color: #1a73e8;
+                        border-left: 4px solid #1a73e8;
+                    }
+                    .field-section { 
+                        margin: 0 0 10px 0; 
+                        font-size: 12pt; 
+                    }
+                    .field-section b { color: #222; }
+                    .reading-line {
+                        border-top: 1px dashed #bfbfbf;
+                        margin: 20px 0;
+                        height: 1px;
+                        overflow: hidden;
+                    }
+                    .notes-wrapper { 
+                        background-color: #fafafa; 
+                        padding: 15px; 
+                        margin-top: 15px; 
+                        border: 1px solid #eee;
+                    }
+                    .notes-title { 
+                        font-size: 13pt; 
+                        font-weight: bold; 
+                        color: #07C160; 
+                        margin-bottom: 10px;
+                        border-bottom: 1px solid #e5e5e5;
+                        padding-bottom: 5px;
+                    }
+                    p { margin: 8px 0; text-indent: 0; }
+                    h1 { text-align: center; font-size: 16pt; font-weight: bold; }
+                    /* Word中图片样式限制 */
+                    img { max-width: 100%; height: auto; display: block; margin: 10px 0; }
+                </style>
+            </head>
+            <body>
+            `;
+            
+            const chineseNums = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十'];
+            
+            selectedRecords.forEach(({ date, record }) => {
+                htmlContent += `<div class="record-box">`;
+                htmlContent += `<div class="date-title">📅 ${date}</div>`;
+                
+                const notesIndex = record.content.indexOf('笔记与思考：');
+                let upperPart = record.content;
+                let notesHTML = '';
+                
+                if (notesIndex !== -1) {
+                    upperPart = record.content.substring(0, notesIndex);
+                    notesHTML = record.content.substring(notesIndex + 6).trim();
+                }
+
+                const lines = upperPart.split('\n');
+                lines.forEach(line => {
+                    if (['企业研习','阅读','整理输出','AI问答','其他'].some(t => line.includes(t))) {
+                        htmlContent += `<div class="content-type-section">${line}</div>`;
+                    } else if (line.includes('：')) {
+                        const parts = line.split('：');
+                        htmlContent += `<div class="field-section"><b>${parts[0]}：</b>${parts.slice(1).join('：')}</div>`;
+                    } else if (line.trim()) {
+                        htmlContent += `<div class="field-section">${line}</div>`;
+                    }
+                });
+                
+                if (notesHTML) {
+                    htmlContent += `<div class="reading-line"></div>`;
+                    htmlContent += `<div class="notes-wrapper">`;
+                    htmlContent += `<div class="notes-title">✏️ 笔记与思考</div>`;
+                    
+                    let tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = notesHTML;
+                    
+                    const allLis = tempDiv.querySelectorAll('li');
+                    allLis.forEach(li => {
+                        let depth = 0;
+                        let curr = li.parentElement;
+                        let parentList = null;
+                        let isOrdered = false;
+
+                        while(curr && curr !== tempDiv) {
+                            if(curr.tagName === 'OL') {
+                                depth++;
+                                if (!parentList) { parentList = curr; isOrdered = true; }
+                            } else if (curr.tagName === 'UL') {
+                                depth++;
+                                if (!parentList) { parentList = curr; isOrdered = false; }
+                            }
+                            curr = curr.parentElement;
+                        }
+
+                        if (parentList) {
+                            let index = Array.from(parentList.children).filter(c => c.tagName === 'LI').indexOf(li);
+                            let prefix = '';
+
+                            if (isOrdered) {
+                                if (depth === 1) {
+                                    prefix = (index < chineseNums.length ? chineseNums[index] : (index + 1)) + '、';
+                                } else if (depth === 2) {
+                                    prefix = (index + 1) + '.';
+                                } else if (depth >= 3) {
+                                    prefix = index < 20 ? String.fromCharCode(0x2460 + index) : `(${index+1})`;
+                                }
+                            } else {
+                                prefix = '• ';
+                            }
+
+                            let p = document.createElement('p');
+                            p.setAttribute('style', `margin: 4px 0 4px ${depth * 2}em; text-indent: 0; line-height: 1.5;`);
+                            p.innerHTML = `<span style="font-family: SimSun; font-weight: bold; margin-right: 6px;">${prefix}</span>` + li.innerHTML;
+                            li.setAttribute('data-flatten', p.outerHTML);
+                        }
+                    });
+
+                    allLis.forEach(li => {
+                        if (li.hasAttribute('data-flatten')) {
+                            li.outerHTML = li.getAttribute('data-flatten');
+                        }
+                    });
+
+                    const lists = tempDiv.querySelectorAll('ol, ul');
+                    lists.forEach(list => {
+                        let fragment = document.createDocumentFragment();
+                        while(list.firstChild) {
+                            fragment.appendChild(list.firstChild);
+                        }
+                        list.parentNode.replaceChild(fragment, list);
+                    });
+                    
+                    htmlContent += tempDiv.innerHTML;
+                    htmlContent += `</div>`;
+                }
+                
+                htmlContent += `</div>`; 
+            });
+            
+            htmlContent += `</body></html>`;
+            
+            const blob = new Blob(['\ufeff', htmlContent], { type: 'application/msword;charset=utf-8' });
+            const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+            saveAs(blob, `深度工作笔记_${dateStr}.doc`);
+            
+            showNotificationTip('📄 已应用高级排版，成功导出为 WORD 文档！');
+        }
+    </script>
+</body>
+</html>
